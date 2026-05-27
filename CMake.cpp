@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <memory>
 
 #include <opencv2/opencv.hpp>
 
@@ -57,6 +58,9 @@ using anet_type = dlib::loss_metric<
 struct Person {
     string name;
     dlib::matrix<float, 0, 1> descriptor;
+
+    Person(string n, dlib::matrix<float, 0, 1> d)
+        : name(std::move(n)), descriptor(std::move(d)) {}
 };
 
 double getDistance(
@@ -68,13 +72,15 @@ double getDistance(
 
 int main() {
     try {
-        dlib::frontal_face_detector detector = dlib::get_frontal_face_detector();
+        auto detector = std::make_shared<dlib::frontal_face_detector>(
+            dlib::get_frontal_face_detector()
+        );
 
-        dlib::shape_predictor sp;
-        dlib::deserialize("shape_predictor_5_face_landmarks.dat") >> sp;
+        auto sp = std::make_shared<dlib::shape_predictor>();
+        dlib::deserialize("shape_predictor_5_face_landmarks.dat") >> *sp;
 
-        anet_type net;
-        dlib::deserialize("dlib_face_recognition_resnet_model_v1.dat") >> net;
+        auto net = std::make_shared<anet_type>();
+        dlib::deserialize("dlib_face_recognition_resnet_model_v1.dat") >> *net;
 
         vector<Person> knownPeople;
 
@@ -91,14 +97,14 @@ int main() {
 
             dlib::cv_image<dlib::rgb_pixel> dlibImg(rgb);
 
-            vector<dlib::rectangle> faces = detector(dlibImg);
+            vector<dlib::rectangle> faces = (*detector)(dlibImg);
 
             if (faces.empty()) {
                 cout << "등록 이미지에서 얼굴을 찾지 못함: " << entry.path() << endl;
                 continue;
             }
 
-            auto shape = sp(dlibImg, faces[0]);
+            auto shape = (*sp)(dlibImg, faces[0]);
 
             dlib::matrix<dlib::rgb_pixel> faceChip;
             dlib::extract_image_chip(
@@ -107,30 +113,31 @@ int main() {
                 faceChip
             );
 
-            dlib::matrix<float, 0, 1> descriptor = net(faceChip);
+            dlib::matrix<float, 0, 1> descriptor = (*net)(faceChip);
 
             string name = entry.path().stem().string();
-            knownPeople.push_back({ name, descriptor });
+            knownPeople.emplace_back(std::move(name), std::move(descriptor));
 
-            cout << "등록 완료: " << name << endl;
+            cout << "등록 완료: " << knownPeople.back().name << endl;
         }
 
-        VideoCapture cap("professor.mp4");
-        if (!cap.isOpened()) {
+        auto cap = std::make_unique<VideoCapture>("professor.mp4");
+
+        if (!cap->isOpened()) {
             cout << "영상 파일을 열 수 없습니다." << endl;
             return -1;
         }
 
         while (true) {
             Mat frame;
-            cap >> frame;
+            (*cap) >> frame;
 
             for (int i = 0; i < 5; i++) {
-                cap.grab();
+                cap->grab();
             }
 
             if (frame.empty()) {
-                cap.set(CAP_PROP_POS_FRAMES, 0);
+                cap->set(CAP_PROP_POS_FRAMES, 0);
                 continue;
             }
 
@@ -139,10 +146,10 @@ int main() {
 
             dlib::cv_image<dlib::rgb_pixel> dlibFrame(rgbFrame);
 
-            vector<dlib::rectangle> faces = detector(dlibFrame);
+            vector<dlib::rectangle> faces = (*detector)(dlibFrame);
 
             for (const auto& face : faces) {
-                auto shape = sp(dlibFrame, face);
+                auto shape = (*sp)(dlibFrame, face);
 
                 dlib::matrix<dlib::rgb_pixel> faceChip;
                 dlib::extract_image_chip(
@@ -151,7 +158,7 @@ int main() {
                     faceChip
                 );
 
-                dlib::matrix<float, 0, 1> descriptor = net(faceChip);
+                dlib::matrix<float, 0, 1> descriptor = (*net)(faceChip);
 
                 string resultName = "Unknown";
                 double bestDistance = 999.0;
@@ -205,7 +212,6 @@ int main() {
             }
         }
 
-        cap.release();
         destroyAllWindows();
     }
     catch (const std::exception& e) {
