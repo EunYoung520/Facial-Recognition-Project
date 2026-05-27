@@ -185,8 +185,5 @@ professor dist=0.04
 - https://github.com/davisking/dlib-models
 - https://github.com/microsoft/vcpkg
 - http://dlib.net/dnn_face_recognition_ex.cpp.html
- ├─ known/
- │   └─ professor.png
- └─ out/
 
 
