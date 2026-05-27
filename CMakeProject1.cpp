@@ -121,7 +121,7 @@ int main() {
             cout << "등록 완료: " << knownPeople.back().name << endl;
         }
 
-        auto cap = std::make_unique<VideoCapture>("professor.mp4");
+        auto cap = std::make_unique<VideoCapture>("teachers_day.mp4");
 
         if (!cap->isOpened()) {
             cout << "영상 파일을 열 수 없습니다." << endl;
